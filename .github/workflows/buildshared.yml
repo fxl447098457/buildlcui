@@ -2,7 +2,7 @@ name: LCUI3 Windows Shared Library
 
 on:
   push:
-    branches: [develop, master, main]
+    branches: [develop]    # ← 只保留 develop
     tags: ['v*']
   pull_request:
 
@@ -31,7 +31,6 @@ jobs:
           package-cache: false
 
       - name: Configure
-        # 去掉 --ci-env=y，-y 表示自动确认
         run: xmake config -y -v -k ${{ env.TARGET_KIND }} -m ${{ matrix.mode }}
 
       - name: Build
