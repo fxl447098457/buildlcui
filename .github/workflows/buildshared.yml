@@ -31,7 +31,8 @@ jobs:
           package-cache: false
 
       - name: Configure
-        run: xmake config -y -v -k ${{ env.TARGET_KIND }} -m ${{ matrix.mode }} --ci-env=y
+        # 去掉 --ci-env=y，-y 表示自动确认
+        run: xmake config -y -v -k ${{ env.TARGET_KIND }} -m ${{ matrix.mode }}
 
       - name: Build
         run: xmake -v
@@ -53,6 +54,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     needs: [build]
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
