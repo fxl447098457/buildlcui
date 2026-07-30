@@ -3,8 +3,7 @@ name: LCUI3 Windows Shared Library
 on:
   workflow_dispatch:
   push:
-    branches: [develop]
-    tags: ['v*']
+    branches: [main, master]
   pull_request:
 
 env:
@@ -20,10 +19,14 @@ jobs:
       fail-fast: false
       matrix:
         mode: [release, debug]
-    name: "Build Windows shared library (${{ matrix.mode }})"
+        arch: [x86, x64]
+    name: "Build Windows shared library (${{ matrix.arch }} ${{ matrix.mode }})"
     steps:
+      # 拉取 LCUI 官方仓库的 develop 分支
       - uses: actions/checkout@v4
         with:
+          repository: lc-soft/LCUI      # ← 指定别人的仓库
+          ref: develop                    # ← 指定 develop 分支
           submodules: recursive
 
       - uses: xmake-io/github-action-setup-xmake@v1
@@ -32,7 +35,7 @@ jobs:
           package-cache: false
 
       - name: Configure
-        run: xmake config -y -v -k ${{ env.TARGET_KIND }} -m ${{ matrix.mode }}
+        run: xmake config -y -v -k ${{ env.TARGET_KIND }} -m ${{ matrix.mode }} -a ${{ matrix.arch }}
 
       - name: Build
         run: xmake -v
@@ -47,5 +50,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: lcui${{ env.TARGET_MAJOR }}-${{ env.TARGET_VERSION }}-${{ env.TARGET_KIND }}-${{ matrix.mode }}-windows
+          name: lcui${{ env.TARGET_MAJOR }}-${{ env.TARGET_VERSION }}-${{ env.TARGET_KIND }}-${{ matrix.arch }}-${{ matrix.mode }}-windows
           path: dist/lcui-package
