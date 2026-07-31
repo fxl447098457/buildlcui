@@ -53,47 +53,33 @@ jobs:
 
           for path in files:
               if not os.path.exists(path):
-                  print(f"SKIP (not found): {path}")
+                  print("SKIP (not found): " + path)
                   continue
 
               with open(path, "r", encoding="utf-8") as f:
                   lines = f.readlines()
 
-              # 1) Add export_all after set_kind
               new_lines = []
               patched = False
               for line in lines:
                   new_lines.append(line)
                   stripped = line.strip()
-                  if not patched and stripped.startswith('set_kind('):
-                      # Get indentation from original line
+                  if not patched and stripped.startswith("set_kind("):
                       indent = line[:len(line) - len(line.lstrip())]
-                      new_lines.append(f'{indent}add_rules("utils.symbols.export_all")
-')
+                      new_lines.append(indent + 'add_rules("utils.symbols.export_all")' + os.linesep)
                       patched = True
-                      print(f"PATCHED export_all: {path}")
+                      print("PATCHED export_all: " + path)
 
               if not patched:
-                  print(f"WARN: set_kind not found in {path}")
+                  print("WARN: set_kind not found in " + path)
 
-              # 2) Remove warnings as errors
               content = "".join(new_lines)
               if 'set_warnings("all", "error")' in content:
                   content = content.replace('set_warnings("all", "error")', 'set_warnings("all")')
-                  print(f"PATCHED warnings: {path}")
+                  print("PATCHED warnings: " + path)
 
-              with open(path, "w", encoding="utf-8", newline="
-") as f:
+              with open(path, "w", encoding="utf-8", newline="\n") as f:
                   f.write(content)
-
-          # Verify libptk
-          print("\n--- lib/ptk/xmake.lua (first 15 lines) ---")
-          with open("lib/ptk/xmake.lua", "r", encoding="utf-8") as f:
-              for i, line in enumerate(f):
-                  if i >= 15:
-                      break
-                  print(line.rstrip())
-          print("--- end ---\n")
 
           print("Patch done")
 
