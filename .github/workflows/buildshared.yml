@@ -22,12 +22,155 @@ jobs:
         arch: [x86, x64]
     name: "Build Windows shared library (${{ matrix.arch }} ${{ matrix.mode }})"
     steps:
-      # 拉取 LCUI 官方仓库的 develop 分支
       - uses: actions/checkout@v4
         with:
-          repository: lc-soft/LCUI      # ← 指定别人的仓库
-          ref: develop                    # ← 指定 develop 分支
+          repository: lc-soft/LCUI
+          ref: develop
           submodules: recursive
+
+      # ============================================
+      # 关键：修复 Windows shared 模式符号导出
+      # ============================================
+      - name: Patch xmake.lua for Windows DLL
+        shell: pwsh
+        run: |
+          # 给 libptk 添加 export_all 规则
+          $file = "lib/ptk/xmake.lua"
+          $content = Get-Content $file -Raw
+          if (-not $content.Contains("export_all")) {
+            $content = $content -replace '(target\("libptk"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+            Set-Content $file $content -NoNewline
+            Write-Host "Patched lib/ptk/xmake.lua"
+          }
+
+          # 给 libui 添加 export_all 规则（ui_updater_* 符号在这里）
+          $file = "lib/ui/xmake.lua"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            if (-not $content.Contains("export_all")) {
+              $content = $content -replace '(target\("libui"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+              Set-Content $file $content -NoNewline
+              Write-Host "Patched lib/ui/xmake.lua"
+            }
+          }
+
+          # 给 libui-server 添加 export_all 规则
+          $file = "lib/ui-server/xmake.lua"
+          $content = Get-Content $file -Raw
+          if (-not $content.Contains("export_all")) {
+            $content = $content -replace '(target\("libui-server"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+            Set-Content $file $content -NoNewline
+            Write-Host "Patched lib/ui-server/xmake.lua"
+          }
+
+          # 给 libcss 添加 export_all 规则
+          $file = "lib/css/xmake.lua"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            if (-not $content.Contains("export_all")) {
+              $content = $content -replace '(target\("libcss"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+              Set-Content $file $content -NoNewline
+              Write-Host "Patched lib/css/xmake.lua"
+            }
+          }
+
+          # 给 pandagl 添加 export_all 规则
+          $file = "lib/pandagl/xmake.lua"
+          $content = Get-Content $file -Raw
+          if (-not $content.Contains("export_all")) {
+            $content = $content -replace '(target\("pandagl"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+            Set-Content $file $content -NoNewline
+            Write-Host "Patched lib/pandagl/xmake.lua"
+          }
+
+          # 给 libthread 添加 export_all 规则
+          $file = "lib/thread/xmake.lua"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            if (-not $content.Contains("export_all")) {
+              $content = $content -replace '(target\("libthread"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+              Set-Content $file $content -NoNewline
+              Write-Host "Patched lib/thread/xmake.lua"
+            }
+          }
+
+          # 给 libworker 添加 export_all 规则
+          $file = "lib/worker/xmake.lua"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            if (-not $content.Contains("export_all")) {
+              $content = $content -replace '(target\("libworker"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+              Set-Content $file $content -NoNewline
+              Write-Host "Patched lib/worker/xmake.lua"
+            }
+          }
+
+          # 给 libui-cursor 添加 export_all 规则
+          $file = "lib/ui-cursor/xmake.lua"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            if (-not $content.Contains("export_all")) {
+              $content = $content -replace '(target\("libui-cursor"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+              Set-Content $file $content -NoNewline
+              Write-Host "Patched lib/ui-cursor/xmake.lua"
+            }
+          }
+
+          # 给 libui-xml 添加 export_all 规则
+          $file = "lib/ui-xml/xmake.lua"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            if (-not $content.Contains("export_all")) {
+              $content = $content -replace '(target\("libui-xml"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+              Set-Content $file $content -NoNewline
+              Write-Host "Patched lib/ui-xml/xmake.lua"
+            }
+          }
+
+          # 给 libui-router 添加 export_all 规则
+          $file = "lib/ui-router/xmake.lua"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            if (-not $content.Contains("export_all")) {
+              $content = $content -replace '(target\("libui-router"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+              Set-Content $file $content -NoNewline
+              Write-Host "Patched lib/ui-router/xmake.lua"
+            }
+          }
+
+          # 给 librouter 添加 export_all 规则
+          $file = "lib/router/xmake.lua"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            if (-not $content.Contains("export_all")) {
+              $content = $content -replace '(target\("librouter"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+              Set-Content $file $content -NoNewline
+              Write-Host "Patched lib/router/xmake.lua"
+            }
+          }
+
+          # 给 libi18n 添加 export_all 规则
+          $file = "lib/i18n/xmake.lua"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            if (-not $content.Contains("export_all")) {
+              $content = $content -replace '(target\("libi18n"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+              Set-Content $file $content -NoNewline
+              Write-Host "Patched lib/i18n/xmake.lua"
+            }
+          }
+
+          # 给 yutil 确认已有 export_all（官方已有，这里做保险）
+          $file = "lib/yutil/xmake.lua"
+          $content = Get-Content $file -Raw
+          if (-not $content.Contains("export_all")) {
+            $content = $content -replace '(target\("yutil"\)[\s\S]*?set_kind\("\$\(kind\)"\))', '$1`n add_rules("utils.symbols.export_all")'
+            Set-Content $file $content -NoNewline
+            Write-Host "Patched lib/yutil/xmake.lua"
+          }
+
+          Write-Host "All patches applied."
+      # ============================================
 
       - uses: xmake-io/github-action-setup-xmake@v1
         with:
