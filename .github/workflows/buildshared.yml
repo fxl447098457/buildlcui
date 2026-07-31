@@ -34,28 +34,44 @@ jobs:
         run: |
           import os
 
-          # 1) 所有子库改为 static（只生成 .lib，不生成 .dll）
           libs = [
               "lib/yutil", "lib/ptk", "lib/pandagl", "lib/css",
               "lib/thread", "lib/worker", "lib/ui", "lib/ui-cursor",
               "lib/ui-server", "lib/ui-xml", "lib/ui-router",
               "lib/router", "lib/i18n",
           ]
+
           for lib in libs:
               path = lib + "/xmake.lua"
               if not os.path.exists(path):
+                  print("SKIP: " + path)
                   continue
               with open(path, "r", encoding="utf-8") as f:
                   content = f.read()
-              # 子库全部静态编译
+
+              # 1) 子库全部 static（只生成 .lib，不生成 .dll）
               content = content.replace('set_kind("$(kind)")', 'set_kind("static")')
-              # 去掉 warnings as errors
+
+              # 2) 去掉 export_all（static 不支持）
+              content = content.replace('add_rules("utils.symbols.export_all")\n', "")
+              content = content.replace('add_rules("utils.symbols.export_all")', "")
+
+              # 3) 去掉 warnings as errors
               content = content.replace('set_warnings("all", "error")', 'set_warnings("all")')
+
+              # 4) 关键：添加 build include 目录（public），让依赖它的 target 能读到 config.h
+              # 在 target 定义后的 set_kind 附近插入
+              if "$(buildir)/include" not in content:
+                  content = content.replace(
+                      'set_kind("static")',
+                      'set_kind("static")\nadd_includedirs("$(buildir)/include", {public = true})'
+                  )
+
               with open(path, "w", encoding="utf-8", newline="\n") as f:
                   f.write(content)
-              print("Set static: " + path)
+              print("Patched: " + path)
 
-          # 2) 根目录 lcui 保持 shared，添加 export_all 导出所有符号
+          # 5) 根目录 lcui 保持 shared，加 export_all 导出所有符号
           with open("xmake.lua", "r", encoding="utf-8") as f:
               lines = f.readlines()
           new_lines = []
