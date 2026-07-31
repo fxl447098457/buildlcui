@@ -33,6 +33,7 @@ jobs:
         shell: python
         run: |
           import os
+          import re
 
           libs = [
               "lib/yutil", "lib/ptk", "lib/pandagl", "lib/css",
@@ -49,7 +50,7 @@ jobs:
               with open(path, "r", encoding="utf-8") as f:
                   content = f.read()
 
-              # 1) 子库全部 static（只生成 .lib，不生成 .dll）
+              # 1) 子库全部 static
               content = content.replace('set_kind("$(kind)")', 'set_kind("static")')
 
               # 2) 去掉 export_all（static 不支持）
@@ -59,19 +60,25 @@ jobs:
               # 3) 去掉 warnings as errors
               content = content.replace('set_warnings("all", "error")', 'set_warnings("all")')
 
-              # 4) 关键：添加 build include 目录（public），让依赖它的 target 能读到 config.h
-              # 在 target 定义后的 set_kind 附近插入
-              if "$(buildir)/include" not in content:
-                  content = content.replace(
-                      'set_kind("static")',
-                      'set_kind("static")\nadd_includedirs("$(buildir)/include", {public = true})'
-                  )
+              # 4) 关键：全局 -k shared 时 is_kind("static") 为 false，
+              #    强制改为 if true 让 set_configvar 无条件执行
+              content = content.replace('if is_kind("static") then', 'if true then')
+
+              # 5) 同时加 add_defines(..., {public=true}) 让依赖者编译时也能看到宏
+              m = re.search(r'set_configvar\("([^"]+_STATIC_BUILD)"\s*,\s*1\)', content)
+              if m:
+                  macro = m.group(1)
+                  old = 'set_kind("static")'
+                  new = 'set_kind("static")\nadd_defines("' + macro + '", {public = true})'
+                  if old in content and new not in content:
+                      content = content.replace(old, new, 1)
+                      print("Added define " + macro + " in " + path)
 
               with open(path, "w", encoding="utf-8", newline="\n") as f:
                   f.write(content)
               print("Patched: " + path)
 
-          # 5) 根目录 lcui 保持 shared，加 export_all 导出所有符号
+          # 6) 根目录 lcui 保持 shared，加 export_all
           with open("xmake.lua", "r", encoding="utf-8") as f:
               lines = f.readlines()
           new_lines = []
