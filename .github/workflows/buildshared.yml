@@ -29,57 +29,52 @@ jobs:
           ref: develop
           submodules: recursive
 
-      - name: Patch xmake.lua for Windows DLL
+      - name: Patch xmake.lua for single DLL
         shell: python
         run: |
           import os
 
-          files = [
-              "xmake.lua",
-              "lib/yutil/xmake.lua",
-              "lib/ptk/xmake.lua",
-              "lib/pandagl/xmake.lua",
-              "lib/css/xmake.lua",
-              "lib/thread/xmake.lua",
-              "lib/worker/xmake.lua",
-              "lib/ui/xmake.lua",
-              "lib/ui-cursor/xmake.lua",
-              "lib/ui-server/xmake.lua",
-              "lib/ui-xml/xmake.lua",
-              "lib/ui-router/xmake.lua",
-              "lib/router/xmake.lua",
-              "lib/i18n/xmake.lua",
+          # 1) 所有子库改为 static（只生成 .lib，不生成 .dll）
+          libs = [
+              "lib/yutil", "lib/ptk", "lib/pandagl", "lib/css",
+              "lib/thread", "lib/worker", "lib/ui", "lib/ui-cursor",
+              "lib/ui-server", "lib/ui-xml", "lib/ui-router",
+              "lib/router", "lib/i18n",
           ]
-
-          for path in files:
+          for lib in libs:
+              path = lib + "/xmake.lua"
               if not os.path.exists(path):
-                  print("SKIP (not found): " + path)
                   continue
-
               with open(path, "r", encoding="utf-8") as f:
-                  lines = f.readlines()
-
-              new_lines = []
-              patched = False
-              for line in lines:
-                  new_lines.append(line)
-                  stripped = line.strip()
-                  if not patched and stripped.startswith("set_kind("):
-                      indent = line[:len(line) - len(line.lstrip())]
-                      new_lines.append(indent + 'add_rules("utils.symbols.export_all")' + os.linesep)
-                      patched = True
-                      print("PATCHED export_all: " + path)
-
-              if not patched:
-                  print("WARN: set_kind not found in " + path)
-
-              content = "".join(new_lines)
-              if 'set_warnings("all", "error")' in content:
-                  content = content.replace('set_warnings("all", "error")', 'set_warnings("all")')
-                  print("PATCHED warnings: " + path)
-
+                  content = f.read()
+              # 子库全部静态编译
+              content = content.replace('set_kind("$(kind)")', 'set_kind("static")')
+              # 去掉 warnings as errors
+              content = content.replace('set_warnings("all", "error")', 'set_warnings("all")')
               with open(path, "w", encoding="utf-8", newline="\n") as f:
                   f.write(content)
+              print("Set static: " + path)
+
+          # 2) 根目录 lcui 保持 shared，添加 export_all 导出所有符号
+          with open("xmake.lua", "r", encoding="utf-8") as f:
+              lines = f.readlines()
+          new_lines = []
+          in_lcui = False
+          patched = False
+          for line in lines:
+              new_lines.append(line)
+              if 'target("lcui")' in line:
+                  in_lcui = True
+              if in_lcui and not patched and line.strip().startswith("set_kind("):
+                  indent = line[:len(line) - len(line.lstrip())]
+                  new_lines.append(indent + 'add_rules("utils.symbols.export_all")\n')
+                  patched = True
+                  in_lcui = False
+          content = "".join(new_lines)
+          content = content.replace('set_warnings("all", "error")', 'set_warnings("all")')
+          with open("xmake.lua", "w", encoding="utf-8", newline="\n") as f:
+              f.write(content)
+          print("Patched root xmake.lua")
 
           print("Patch done")
 
@@ -103,18 +98,17 @@ jobs:
           xmake package
           xmake install -o dist/lcui-package
 
-      - name: List DLL files
+      - name: Zip package
         shell: pwsh
         run: |
-          Write-Host "=== Build output ==="
-          Get-ChildItem -Recurse build\windows\${{ matrix.arch }}\${{ matrix.mode }}\*.dll | ForEach-Object { Write-Host $_.FullName }
-          Write-Host "=== Package output ==="
-          Get-ChildItem -Recurse dist\lcui-package\*.dll | ForEach-Object { Write-Host $_.FullName }
+          $zip = "dist/lcui3-${{ env.TARGET_VERSION }}-${{ matrix.arch }}-${{ matrix.mode }}.zip"
+          Compress-Archive -Path "dist/lcui-package/*" -DestinationPath $zip -Force
+          Write-Host "Created: $zip"
 
       - uses: actions/upload-artifact@v4
         with:
           name: lcui${{ env.TARGET_MAJOR }}-${{ env.TARGET_VERSION }}-${{ env.TARGET_KIND }}-${{ matrix.arch }}-${{ matrix.mode }}-windows
-          path: dist/lcui-package
+          path: dist/lcui3-*.zip
 
   release:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
@@ -151,23 +145,13 @@ jobs:
             "name=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
           }
 
-      - name: Package artifacts into zips
+      - name: Collect zips for release
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path ./release-assets | Out-Null
-          $archs = @("x86", "x64")
-          $modes = @("release", "debug")
-          foreach ($arch in $archs) {
-            foreach ($mode in $modes) {
-              $src = "./artifacts/lcui3-3.0.0-shared-$arch-$mode-windows"
-              $zip = "./release-assets/lcui3-3.0.0-shared-$arch-$mode-windows.zip"
-              if (Test-Path $src) {
-                Compress-Archive -Path "$src/*" -DestinationPath $zip -Force
-                Write-Host "Created: $zip"
-              } else {
-                Write-Host "Warning: $src not found"
-              }
-            }
+          Get-ChildItem -Recurse ./artifacts/*.zip | ForEach-Object {
+            Copy-Item $_.FullName ./release-assets/
+            Write-Host "Collected: $($_.Name)"
           }
 
       - name: Create Release
