@@ -33,7 +33,6 @@ jobs:
         shell: python
         run: |
           import os
-          import re
 
           files = [
               "xmake.lua",
@@ -54,32 +53,47 @@ jobs:
 
           for path in files:
               if not os.path.exists(path):
+                  print(f"SKIP (not found): {path}")
                   continue
-              with open(path, "r", encoding="utf-8") as f:
-                  content = f.read()
 
-              # 1) Add export_all
-              if "utils.symbols.export_all" not in content:
-                  lines = content.splitlines()
-                  new_lines = []
-                  patched = False
-                  for line in lines:
-                      new_lines.append(line)
-                      if not patched and re.match(r'^(\s*)set_kind(["\'])', line):
-                          indent = re.match(r'^(\s*)', line).group(1)
-                          new_lines.append(f'{indent}add_rules("utils.symbols.export_all")')
-                          patched = True
-                  if patched:
-                      with open(path, "w", encoding="utf-8", newline="\n") as f:
-                          f.write("\n".join(new_lines) + "\n")
-                      print(f"Added export_all: {path}")
+              with open(path, "r", encoding="utf-8") as f:
+                  lines = f.readlines()
+
+              # 1) Add export_all after set_kind
+              new_lines = []
+              patched = False
+              for line in lines:
+                  new_lines.append(line)
+                  stripped = line.strip()
+                  if not patched and stripped.startswith('set_kind('):
+                      # Get indentation from original line
+                      indent = line[:len(line) - len(line.lstrip())]
+                      new_lines.append(f'{indent}add_rules("utils.symbols.export_all")
+')
+                      patched = True
+                      print(f"PATCHED export_all: {path}")
+
+              if not patched:
+                  print(f"WARN: set_kind not found in {path}")
 
               # 2) Remove warnings as errors
+              content = "".join(new_lines)
               if 'set_warnings("all", "error")' in content:
-                  new_content = content.replace('set_warnings("all", "error")', 'set_warnings("all")')
-                  with open(path, "w", encoding="utf-8", newline="\n") as f:
-                      f.write(new_content)
-                  print(f"Fixed warnings: {path}")
+                  content = content.replace('set_warnings("all", "error")', 'set_warnings("all")')
+                  print(f"PATCHED warnings: {path}")
+
+              with open(path, "w", encoding="utf-8", newline="
+") as f:
+                  f.write(content)
+
+          # Verify libptk
+          print("\n--- lib/ptk/xmake.lua (first 15 lines) ---")
+          with open("lib/ptk/xmake.lua", "r", encoding="utf-8") as f:
+              for i, line in enumerate(f):
+                  if i >= 15:
+                      break
+                  print(line.rstrip())
+          print("--- end ---\n")
 
           print("Patch done")
 
